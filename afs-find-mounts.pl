@@ -1,7 +1,5 @@
 #!/usr/bin/perl
 
-# $Id$
-
 use strict;
 use File::Find;
 use File::Basename;
@@ -195,17 +193,17 @@ __END__
 
 =head1 NAME
 
-afs-find-mounts.pl - finds all AFS mount points under a given path, and prints the results by-volume or by-path
+afs-find-mounts.pl - finds all AFS mount points under a given path, and prints the results by-volume or by-mount
 
 =head1 SYNOPSIS
 
- afs-find-mounts.pl [-h|--help] [-v|--verbose] [-q|--quiet] [-l|--by-volume] [-m|--by-mount] PATH
+ afs-find-mounts.pl [-h|--help] [-v|--verbose] [-q|--quiet] [-l|--by-volume] [-m|--by-mount] PATH [OUTFILE_BASE]
 
 =head1 OPTIONS
 
 =over 8
 
-=item B<-h>, B<help>
+=item B<-h>, B<--help>
 
 Print this documentation
 
@@ -219,14 +217,20 @@ Only print the mounts by mount or by volume with no processing information. NOT 
 
 =item B<-l>, B<--by-volume>
 
-Print mount points by volume name
+Print mount points by volume name. Can be combined with [-m|--by-mount], which halves processing time if you want mounts
+by both path and volume.
 
 =item B<-m>, B<--by-mount>
 
-Print mount points by mount point path
+Print mount points by mount point path. Can be combined with [-l|--by-volume].
 
 =item B<PATH>
 
 Path to dive into. This can either be relative or absolute. 
+
+=item B<OUTFILE_BASE>
+
+Specifies the filename prefix to use for output. For example, if 'foo' is specified, then the output will be redirected
+to foo-by-path and foo-by-mount.
 
 =cut
