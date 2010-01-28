@@ -154,11 +154,6 @@ sub processdir {
 				and $volume !~ m/.+.backup$/ # not a backup volume
 				and ! defined $volmounts{$volume}{$dir} # haven't already walked this volume
 		) {
-			print "\%volstack is:\n";
-			foreach (keys %volstack) {
-				print "$_\n";
-			}
-			print "\n";
 			$volstack{$volume} = 1; # make it known that we hit $volname on this dive
 			&walkdir($dir, \%volstack);
 			#print "going into $dir";
