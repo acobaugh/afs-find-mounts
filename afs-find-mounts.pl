@@ -172,6 +172,7 @@ sub walkdir {
 
 sub examine_dir {
 	my ($dir) = @_;
+	$dir = shell_quote($dir);
 	
 	my $lsmount = `$fs_cmd lsmount $dir 2>&1`;
 	if ($lsmount =~ m/.*is a mount point.*/) {
