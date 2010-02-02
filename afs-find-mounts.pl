@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 
 use strict;
-use File::Find;
+#use File::Find;
 use File::Basename;
 use Cwd;
 use String::ShellQuote;
@@ -16,7 +16,8 @@ GetOptions(
 	'v|verbose' => \$opt_verbose,
 	'q|quiet' => \$opt_quiet,
 	'l|by-volume' => \$opt_byvolume,
-	'm|by-mount' => \$opt_bymount
+	'm|by-mount' => \$opt_bymount,
+	'max-depth=i' => \(my $opt_maxdepth = 0)
 );
 
 if ($opt_help) {
@@ -73,8 +74,9 @@ $volmounts{$volume}{'mounts'}{$newpath} = $type; # add a mountpoint for this vol
 $mountpoints{$newpath} = {'volume' => $volume, 'cell' => $mtptcell, 'type' => $type};
 $volstack{$volume} = 1; # make it known that we hit $volname on this dive
 
-&walkdir($path, \%volstack);
+&walkdir($path, \%volstack, 0);
 
+# output by volume
 if ($opt_byvolume) {
 	if ($output_to_file) {
 		open OUTFILE, ">$outfile_base-by-volume";
@@ -92,6 +94,7 @@ if ($opt_byvolume) {
 	close OUTFILE;
 }
 
+# output by mount
 if ($opt_bymount) {
 	if ($output_to_file) {
 		open OUTFILE, ">$outfile_base-by-mount";
@@ -109,11 +112,22 @@ if ($opt_bymount) {
 }
 
 # do stuff for every directory in a given directory
+# walkdir() called recursively implements a depth-first 
+# directory recursion
 sub walkdir {
 	my $path = $_[0];
 	my %volstack = %{$_[1]};
+	my $depth = $_[2];
 	my (@entries, $entry, $entry_relative);
+	
+	$depth++;
 
+	if (($depth gt $opt_maxdepth) and ($opt_maxdepth gt 0)) {
+		if ($opt_verbose) {
+			print "max depth hit\n";
+		}
+		return;
+	}
 	opendir(DIR, $path);
 	@entries = readdir(DIR);
 	closedir(DIR);
@@ -123,8 +137,32 @@ sub walkdir {
 		if ($entry ne "." and $entry ne "..") {
 			$entry = $path . "/" . $entry;
 			if ( -d $entry and ! -l $entry) {
-				print "Processing $entry as a directory" if $opt_verbose;
-				&processdir($entry, \%volstack);	
+				print "Processing $entry as a directory\n" if $opt_verbose;
+				#&processdir($entry, \%volstack, $depth);	
+				my ($volume, $type, $mtptcell) = examine_dir($entry);
+				if ($volume ne 0) {
+					# store this mountpoint and mtpt type for $volume
+					$volmounts{$volume}{'cell'} = $mtptcell;
+					$volmounts{$volume}{'mounts'}{$entry} = $type; # add a mountpoint for this volume
+
+					# store this volume, cell, and type for this mtpt
+					$mountpoints{$entry} = {'volume' => $volume, 'cell' => $mtptcell, 'type' => $type};
+					
+					# dont't go down if:
+					if ($volstack{$volume} != 1 # we're not already in this volume
+							and $mtptcell eq $wscell # volume is in our cell
+							and $volume !~ m/.+.backup$/ # not a backup volume
+							and ! defined $volmounts{$volume}{$entry} # haven't already walked this volume
+					) {
+						$volstack{$volume} = 1; # make it known that we hit $volname on this dive
+						&walkdir($entry, \%volstack, $depth);
+						#print "going into $dir";
+					}
+				}
+				else { 
+					# it's not a mountpoint, but we still need to go into it
+					&walkdir($entry, \%volstack, $depth);
+				}
 			} else {
 				print "$entry is not a directory\n" if $opt_verbose;
 			}
@@ -135,32 +173,10 @@ sub walkdir {
 sub processdir {
 	my $dir = shell_quote($_[0]);
 	my %volstack = %{$_[1]};
+	my $depth = $_[2];
 	#print "processing $dir\n";
+	
 
-	my ($volume, $type, $mtptcell) = examine_dir($dir);
-	if ($volume ne 0) {
-		# store this mountpoint and mtpt type for $volume
-		$volmounts{$volume}{'cell'} = $mtptcell;
-		$volmounts{$volume}{'mounts'}{$dir} = $type; # add a mountpoint for this volume
-
-		# store this volume, cell, and type for this mtpt
-		$mountpoints{$dir} = {'volume' => $volume, 'cell' => $mtptcell, 'type' => $type};
-		
-		# dont't go down if:
-		if ($volstack{$volume} != 1 # we're not already in this volume
-				and $mtptcell eq $wscell # volume is in our cell
-				and $volume !~ m/.+.backup$/ # not a backup volume
-				and ! defined $volmounts{$volume}{$dir} # haven't already walked this volume
-		) {
-			$volstack{$volume} = 1; # make it known that we hit $volname on this dive
-			&walkdir($dir, \%volstack);
-			#print "going into $dir";
-		}
-	}
-	else { 
-		# it's not a mountpoint, but we still need to go into it
-		&walkdir($dir, \%volstack);
-	}
 }
 
 sub examine_dir {
@@ -169,18 +185,19 @@ sub examine_dir {
 	my $lsmount = `$fs_cmd lsmount $dir 2>&1`;
 	if ($lsmount =~ m/.*is a mount point.*/) {
 		$lsmount =~ s/.*is a mount point for volume '(.+)'\n/$1/;
-		$lsmount =~ s/(.+)(:.*)/$1/;
-		my $mtptcell = $2;
+	
+		$lsmount =~ s/(%|#)(.+)/$2/;
+		my $type = $1;
+		
+		$lsmount =~ s/(.+:)?(.*)/$2/;
+		my $mtptcell = $1;
+		my $volume = $2;
 		
 		if ($mtptcell eq "")	{
 			$mtptcell = $wscell;
 		} else {
 			$mtptcell =~ s/://;
 		}
-
-		$lsmount =~ m/(%|#)(.+)/;
-		my $type = $1;
-		my $volume = $2;
 
 		return ($volume, $type, $mtptcell);
 	}
