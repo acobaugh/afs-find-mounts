@@ -24,7 +24,7 @@ if ($opt_help) {
 	exec('perldoc', '-t', $0) or die "Cannot feed myself to perldoc\n";
 	exit 0;
 } elsif ($#ARGV eq -1) {
-	print "Usage: $0 [-h|--help] [-v|--verbose] [-q|--quiet] [-l|--by-volume] [-m|--by-mount] PATH [OUTFILE_BASE]\n";
+	print "Usage: $0 [-h|--help] [-v|--verbose] [-q|--quiet] [-l|--by-volume] [-m|--by-mount] [--max-depth DEPTH] PATH [OUTFILE_BASE]\n";
 	exit 0;
 }
 
@@ -170,15 +170,6 @@ sub walkdir {
 	}
 }
 
-sub processdir {
-	my $dir = shell_quote($_[0]);
-	my %volstack = %{$_[1]};
-	my $depth = $_[2];
-	#print "processing $dir\n";
-	
-
-}
-
 sub examine_dir {
 	my ($dir) = @_;
 	
@@ -214,7 +205,7 @@ afs-find-mounts.pl - finds all AFS mount points under a given path, and prints t
 
 =head1 SYNOPSIS
 
- afs-find-mounts.pl [-h|--help] [-v|--verbose] [-q|--quiet] [-l|--by-volume] [-m|--by-mount] PATH [OUTFILE_BASE]
+ afs-find-mounts.pl [-h|--help] [-v|--verbose] [-q|--quiet] [-l|--by-volume] [-m|--by-mount] [--max-depth DEPTH] PATH [OUTFILE_BASE]
 
 =head1 OPTIONS
 
@@ -240,6 +231,11 @@ by both path and volume.
 =item B<-m>, B<--by-mount>
 
 Print mount points by mount point path. Can be combined with [-l|--by-volume].
+
+=item B<--max-depth> DEPTH
+
+A positive integer specifying the maximum recursion depth. When DEPTH = 1, this means we'll only look at directories
+directly below PATH.
 
 =item B<PATH>
 
